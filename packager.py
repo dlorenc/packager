@@ -36,9 +36,9 @@ def set_layer_cache(pkg, contents, cache_dir):
         f.write(contents)
 
 
-def handle_app(pm, cache_dir):
+def handle_app(pm, base_image, cache_dir):
     packages = pm.get_package_list()
-    img = pm.base_image()
+    img = base_image
     # This loop could be parallelized.
     for pkg in packages:
         contents = get_layer_cache(pkg, cache_dir)
@@ -49,48 +49,15 @@ def handle_app(pm, cache_dir):
     return img
 
 
-def main(root_dir, dst_image):
-    transport = transport_pool.Http(httplib2.Http, size=32)
-    cache_dir = os.path.join(root_dir, '.cache')
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
-    base = docker_name.Tag('gcr.io/google-appengine/nodejs:latest')
-    creds = docker_creds.DefaultKeychain.Resolve(base)        
-    with docker_image.FromRegistry(base, creds, transport) as base_img:
-        npm = NPM(root_dir, base_img)
-        for i in range(10):
-            start = time.time()
-            dst = docker_name.Tag(dst_image)
-            creds = docker_creds.DefaultKeychain.Resolve(dst)
-            with docker_session.Push(dst, creds, transport, threads=32) as session:
-                img = handle_app(npm, cache_dir)
-                session.upload(img)
-            print time.time() - start
-
-
 class NPM(object):
-    
-    def __init__(self, app_dir, base_img):
-        self._app_dir = app_dir
-        self._base = base_img
-        # Force it to load everything.
-        self._base.manifest()
-
-    def base_image(self):
-        return self._base
+    def __init__(self, npm_config):
+        self.package_json_contents = json.loads(npm_config.package_json)
+        self.package_lock_contents = json.loads(npm_config.package_lock_json)
 
     def get_package_list(self):
-        pj = os.path.join(self._app_dir, 'package.json')
-        with open(pj) as f:
-            package_contents = json.load(f)
-        
-        pl = os.path.join(self._app_dir, 'package-lock.json')
-        with open(pl) as f:
-            package_lock_contents = json.load(f)
-
         deps = []
-        for name in package_contents['dependencies']:
-            version = package_lock_contents['dependencies'][name]['version']
+        for name in self.package_json_contents['dependencies']:
+            version = self.package_lock_contents['dependencies'][name]['version']
             deps.append('%s@%s' % (name, version))
         return deps
 
@@ -109,11 +76,3 @@ chmod -R +r /tmp/node_modules
         finally:
             shutil.rmtree(tmp_path)
         return contents
-
-
-if __name__ == "__main__":
-    # Root dir is the first arg.
-    if len(sys.argv) != 3:
-        print 'Usage: bazel run :packager -- $(pwd) <IMAGE_NAME>'
-        sys.exit(1)
-    main(sys.argv[1], sys.argv[2])

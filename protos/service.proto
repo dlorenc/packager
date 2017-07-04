@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+service AppBuilder {
+    rpc BuildContainer(BuildContainerRequest) returns (BuildContainerResponse);
+}
+
+enum PackageManager {
+    NPM = 0;
+    PIP = 1;
+}
+
+message NpmConfig {
+    bytes package_json = 1;
+    bytes package_lock_json = 2;
+}
+
+message PipConfig {
+    bytes requirements_txt = 1;
+}
+
+message BuildContainerRequest {
+    string base_image = 1;
+    string destination_image = 2;
+    oneof package_manager {
+        NpmConfig npm_config = 3;
+        PipConfig pip_config = 4;
+    }
+}
+
+message BuildContainerResponse {
+    string container_digest = 1;
+}
