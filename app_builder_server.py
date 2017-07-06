@@ -17,6 +17,8 @@ from containerregistry.client import docker_creds
 from containerregistry.client import docker_name
 from containerregistry.client.v2_2 import docker_image
 from containerregistry.client.v2_2 import docker_session
+from containerregistry.client.v2_2 import save
+from containerregistry.client.v2_2 import util
 from containerregistry.transport import transport_pool
 
 class AppBuilderServicer(service_pb2.AppBuilderServicer):
@@ -41,16 +43,17 @@ class AppBuilderServicer(service_pb2.AppBuilderServicer):
         which = request.WhichOneof("package_manager") 
         if which == "npm_config":
             pm = packager.NPM(request.npm_config)
-        elif which == "pip":
-            pass
-            #pm = packager.PIP(request.pip_config)
+        elif which == "pip_config":
+            pm = packager.PIP(request.pip_config)
 
         img = packager.handle_app(pm, base_image, self._build_cache_dir)
         dst = docker_name.Tag(request.destination_image)
         creds = docker_creds.DefaultKeychain.Resolve(dst)
         with docker_session.Push(dst, creds, self.transport, threads=32) as session:
             session.upload(img)
-        return service_pb2.BuildContainerResponse()
+
+        container_digest = request.destination_image + '@' + util.Digest(img.manifest())
+        return service_pb2.BuildContainerResponse(container_digest=container_digest)
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

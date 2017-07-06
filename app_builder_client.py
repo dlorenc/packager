@@ -14,12 +14,19 @@ def main():
   stub = service_pb2_grpc.AppBuilderStub(channel)
 
   # Create Container
-  pj = open('package.json', 'r').read()
-  pl = open('package-lock.json', 'r').read()
+  # pj = open('package.json', 'r').read()
+  # pl = open('package-lock.json', 'r').read()
+  # stub.BuildContainer(service_pb2.BuildContainerRequest(
+  #   base_image='gcr.io/google-appengine/nodejs:latest',
+  #   destination_image='gcr.io/dlorenc-vmtest2/foobartest:latest',
+  #   npm_config=service_pb2.NpmConfig(package_json=pj, package_lock_json=pl))
+  # )
+
+  rt = open('requirements.txt', 'r').read()
   stub.BuildContainer(service_pb2.BuildContainerRequest(
-    base_image='gcr.io/google-appengine/nodejs:latest',
-    destination_image='gcr.io/dlorenc-vmtest2/foobartest:latest',
-    npm_config=service_pb2.NpmConfig(package_json=pj, package_lock_json=pl))
+    base_image='gcr.io/google-appengine/python:latest',
+    destination_image='gcr.io/dlorenc-vmtest2/foobartestpy:latest',
+    pip_config=service_pb2.PipConfig(requirements_txt=rt))
   )
 
 
